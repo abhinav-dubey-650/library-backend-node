@@ -1,0 +1,35 @@
+-- Additional engaging achievements (monthly + lifetime + streaks)
+-- threshold_unit MONTH_MINUTES / MONTH_DAYS require achievements.service support
+
+INSERT INTO achievement_definitions (code, category, title, description, threshold_value, threshold_unit, icon_key, sort_order) VALUES
+('STREAK_3', 'STREAK', '3 Day Streak', 'Study at the library 3 days in a row', 3, 'STREAK_DAYS', 'streak', 9),
+('STREAK_5', 'STREAK', '5 Day Streak', 'Study at the library 5 days in a row', 5, 'STREAK_DAYS', 'streak', 9),
+('STREAK_21', 'STREAK', '21 Day Habit', 'Build a 21-day study habit at the library', 21, 'STREAK_DAYS', 'streak', 11),
+('STREAK_45', 'STREAK', '45 Day Streak', 'Study 45 days in a row — unstoppable', 45, 'STREAK_DAYS', 'streak', 12),
+('STREAK_60', 'STREAK', '60 Day Streak', 'Two months straight — elite discipline', 60, 'STREAK_DAYS', 'streak', 13),
+('DAYS_7', 'ATTENDANCE', '7 Days Total', 'Attend the library on 7 different days', 7, 'DAYS', 'calendar', 39),
+('DAYS_14', 'ATTENDANCE', '14 Days Total', 'Attend the library on 14 different days', 14, 'DAYS', 'calendar', 40),
+('DAYS_60', 'ATTENDANCE', '60 Days Total', '60 days of showing up — serious student', 60, 'DAYS', 'calendar', 42),
+('DAYS_100', 'ATTENDANCE', '100 Days Club', '100 days at the library — legend status', 100, 'DAYS', 'calendar', 43),
+('HOURS_110', 'HOURS', '110 Hours Studied', '110 lifetime hours at the library', 6600, 'MINUTES', 'hours', 33),
+('HOURS_120', 'HOURS', '120 Hours Studied', '120 lifetime hours at the library', 7200, 'MINUTES', 'hours', 34),
+('HOURS_130', 'HOURS', '130 Hours Studied', '130 lifetime hours at the library', 7800, 'MINUTES', 'hours', 35),
+('HOURS_140', 'HOURS', '140 Hours Studied', '140 lifetime hours at the library', 8400, 'MINUTES', 'hours', 36),
+('HOURS_150', 'HOURS', '150 Hours Studied', '150 lifetime hours — mastery milestone', 9000, 'MINUTES', 'hours', 37),
+('MONTH_10H', 'MONTHLY', '10 Hours This Month', 'Log 10 hours of study this month', 600, 'MONTH_MINUTES', 'hours', 60),
+('MONTH_25H', 'MONTHLY', '25 Hours This Month', 'Log 25 hours of study this month', 1500, 'MONTH_MINUTES', 'hours', 61),
+('MONTH_50H', 'MONTHLY', '50 Hours This Month', 'Log 50 hours of study this month', 3000, 'MONTH_MINUTES', 'hours', 62),
+('MONTH_75H', 'MONTHLY', '75 Hours This Month', 'Log 75 hours of study this month', 4500, 'MONTH_MINUTES', 'hours', 63),
+('MONTH_100H', 'MONTHLY', '100 Hours This Month', 'Log 100 hours of study this month', 6000, 'MONTH_MINUTES', 'hours', 64),
+('MONTH_125H', 'MONTHLY', '125 Hours This Month', 'Log 125 hours of study this month', 7500, 'MONTH_MINUTES', 'hours', 65),
+('MONTH_150H', 'MONTHLY', '150 Hour Goal', 'Hit the 150-hour monthly target', 9000, 'MONTH_MINUTES', 'trophy', 66),
+('MONTH_5D', 'MONTHLY', '5 Days This Month', 'Study at the library on 5 days this month', 5, 'MONTH_DAYS', 'calendar', 70),
+('MONTH_10D', 'MONTHLY', '10 Days This Month', 'Study at the library on 10 days this month', 10, 'MONTH_DAYS', 'calendar', 71),
+('MONTH_15D', 'MONTHLY', '15 Days This Month', 'Study at the library on 15 days this month', 15, 'MONTH_DAYS', 'calendar', 72),
+('MONTH_20D', 'MONTHLY', '20 Days This Month', 'Study at the library on 20 days this month', 20, 'MONTH_DAYS', 'calendar', 73),
+('MONTH_25D', 'MONTHLY', '25 Days This Month', 'Study almost every day this month', 25, 'MONTH_DAYS', 'calendar', 74),
+('RANK_TOP10', 'RANK', 'Top 10 Rank', 'Reach top 10 on the study hours leaderboard', 10, 'RANK_POSITION', 'trophy', 80),
+('RANK_TOP5', 'RANK', 'Top 5 Rank', 'Reach top 5 on the study hours leaderboard', 5, 'RANK_POSITION', 'trophy', 81),
+('RANK_TOP3', 'RANK', 'Podium Finish', 'Reach top 3 on the study hours leaderboard', 3, 'RANK_POSITION', 'trophy', 82),
+('RANK_1', 'RANK', 'Number One', 'Rank #1 on the monthly study hours leaderboard', 1, 'RANK_POSITION', 'trophy', 83)
+ON CONFLICT (code) DO NOTHING;
