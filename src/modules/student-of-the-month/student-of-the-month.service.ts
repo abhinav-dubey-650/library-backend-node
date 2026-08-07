@@ -26,7 +26,8 @@ async function computeStudentOfTheMonth(yr: number, mo: number) {
   // total instead of the old N+1 one-query-per-member streak loop).
   const [membersRes, aggRes, datesRes] = await Promise.all([
     SimpleDatabase.query(
-      `SELECT id, member_id, full_name FROM users WHERE role = 'MEMBER' ORDER BY id`,
+      `SELECT id, member_id, full_name FROM users
+        WHERE role = 'MEMBER' AND is_active = true ORDER BY id`,
       []
     ),
     SimpleDatabase.query(

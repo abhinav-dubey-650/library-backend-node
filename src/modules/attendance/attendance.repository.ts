@@ -159,12 +159,15 @@ export async function countPresentDaysForUserInRange(userId: number, start: stri
 }
 
 export async function aggregateMinutesByUserInRange(start: string, end: string) {
+  // Only active members — deleted/inactive students must never appear on the
+  // leaderboard even if orphaned summary rows somehow remain.
   const res = await SimpleDatabase.query(
-    `SELECT user_id, COALESCE(SUM(total_minutes), 0)::bigint AS minutes,
-            COUNT(CASE WHEN total_minutes > 0 THEN 1 END)::bigint AS days
-     FROM daily_attendance_summary
-     WHERE attendance_date >= $1 AND attendance_date <= $2
-     GROUP BY user_id`,
+    `SELECT d.user_id, COALESCE(SUM(d.total_minutes), 0)::bigint AS minutes,
+            COUNT(CASE WHEN d.total_minutes > 0 THEN 1 END)::bigint AS days
+     FROM daily_attendance_summary d
+     JOIN users u ON u.id = d.user_id AND u.role = 'MEMBER' AND u.is_active = true
+     WHERE d.attendance_date >= $1 AND d.attendance_date <= $2
+     GROUP BY d.user_id`,
     [start, end]
   );
   return res.rows;

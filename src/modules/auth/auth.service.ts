@@ -12,6 +12,7 @@ import { notifyNewMemberFromUserId, DEFAULT_EXAM_NAME } from "../whatsapp/librar
 import { validateSeatForAssignment } from "../booking/booking.service";
 import * as bookingRepo from "../booking/booking.repository";
 import { invalidateLeaderboardCache } from "../attendance/attendance-stats.service";
+import { invalidateStudentOfMonthCache } from "../student-of-the-month/student-of-the-month.service";
 import { invalidateAuthUser } from "../../middlewares/authMiddleware";
 import { insertInvoice } from "../fees/fees.repository";
 import * as repo from "./auth.repository";
@@ -246,6 +247,7 @@ export async function setActiveStatus(userId: number, active: boolean) {
   const updated = await repo.updateUser(userId, { is_active: active });
   invalidateAuthUser(userId);
   invalidateLeaderboardCache();
+  invalidateStudentOfMonthCache();
   return serializeUserWithSeat(updated);
 }
 
@@ -280,6 +282,7 @@ export async function deleteStudent(userId: number) {
   });
   invalidateAuthUser(userId);
   invalidateLeaderboardCache();
+  invalidateStudentOfMonthCache();
 }
 
 export async function changeOwnPassword(userId: number, currentPassword: string, newPassword: string) {

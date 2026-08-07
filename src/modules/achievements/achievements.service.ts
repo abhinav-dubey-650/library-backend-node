@@ -35,10 +35,11 @@ async function getMonthRank(userId: number, year: number, month: number): Promis
   const end = monthEnd(year, month);
   const res = await SimpleDatabase.query(
     `WITH ranked AS (
-       SELECT user_id, ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(total_minutes), 0) DESC) AS rk
-       FROM daily_attendance_summary
-       WHERE attendance_date >= $1 AND attendance_date <= $2
-       GROUP BY user_id
+       SELECT d.user_id, ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(d.total_minutes), 0) DESC) AS rk
+       FROM daily_attendance_summary d
+       JOIN users u ON u.id = d.user_id AND u.role = 'MEMBER' AND u.is_active = true
+       WHERE d.attendance_date >= $1 AND d.attendance_date <= $2
+       GROUP BY d.user_id
      )
      SELECT rk FROM ranked WHERE user_id = $3`,
     [start, end, userId]
