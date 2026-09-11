@@ -1,4 +1,5 @@
 import { createHandler } from "../../core/http/createHandler";
+import { AppError } from "../../core/errors/AppError";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireAdminOrLibrarian } from "../../middlewares/requireRole";
 import * as svc from "./attendance.service";
@@ -56,6 +57,14 @@ export const seatMapSnapshot = createHandler(async (req, res) => {
 
 export const getActiveSessions = createHandler(async (_req, res) => {
   res.status(200).json(await svc.getActiveSessions());
+});
+
+export const getDailyAttendance = createHandler(async (req, res) => {
+  const date = String(req.query.date ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw AppError.badRequest("date is required as YYYY-MM-DD");
+  }
+  res.status(200).json(await svc.getDailyAttendance(date));
 });
 
 export { authenticate, requireAdminOrLibrarian };

@@ -353,3 +353,29 @@ export async function getPaymentHistory(
   });
   return springPage(content, total, page, size);
 }
+
+export async function getPaymentsByDate(date: string) {
+  const rows = await repo.findPaymentsByDate(date);
+  return rows.map((r) => {
+    const invoiceAmount = Number(r.invoice_amount);
+    const cumulativePaid = Number(r.cumulative_paid);
+    const remainingAfter = Math.max(0, invoiceAmount - cumulativePaid);
+    return {
+      id: Number(r.id),
+      amount: Number(r.amount),
+      paymentMethod: r.payment_method ?? "CASH",
+      paidAt: r.paid_at instanceof Date ? r.paid_at.toISOString() : String(r.paid_at),
+      notes: r.notes ?? null,
+      invoiceId: Number(r.invoice_id),
+      billingYear: Number(r.billing_year),
+      billingMonth: Number(r.billing_month),
+      planName: r.plan_name ?? null,
+      invoiceAmount,
+      remainingAfter,
+      userId: Number(r.user_id),
+      memberId: r.member_id,
+      fullName: r.full_name,
+      recordedByName: r.recorded_by_name ?? null,
+    };
+  });
+}

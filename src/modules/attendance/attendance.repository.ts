@@ -173,6 +173,27 @@ export async function aggregateMinutesByUserInRange(start: string, end: string) 
   return res.rows;
 }
 
+/**
+ * All punch in/out sessions for a given IST calendar day (rows carry both
+ * check-in and check-out timestamps). Joins the member profile and their
+ * assigned seat so admins see name, ID and seat in one query.
+ */
+export async function findAttendanceByDate(date: string) {
+  const res = await SimpleDatabase.query(
+    `SELECT a.id AS attendance_id, a.user_id,
+            u.member_id, u.full_name, u.is_active,
+            s.seat_number,
+            a.check_in_time, a.check_out_time
+     FROM attendance a
+     JOIN users u ON u.id = a.user_id AND u.role = 'MEMBER'
+     LEFT JOIN seats s ON s.id = u.assigned_seat_id
+     WHERE (a.check_in_time AT TIME ZONE 'UTC' + INTERVAL '5 hours 30 minutes')::date = $1::date
+     ORDER BY a.check_in_time`,
+    [date]
+  );
+  return res.rows;
+}
+
 export async function findAllMembers() {
   const res = await SimpleDatabase.query(
     `SELECT ${USER_COLUMNS} FROM users WHERE role = 'MEMBER' AND is_active = true ORDER BY id`,

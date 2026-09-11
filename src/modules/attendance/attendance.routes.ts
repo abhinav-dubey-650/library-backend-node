@@ -13,3 +13,4 @@ attendanceRouter.get("/leaderboard", c.authenticate, c.leaderboard);
 attendanceRouter.get("/occupied-seats", c.authenticate, c.occupiedSeats);
 attendanceRouter.get("/seat-map", c.authenticate, c.seatMapSnapshot);
 attendanceRouter.get("/active", c.authenticate, c.requireAdminOrLibrarian, c.getActiveSessions);
+attendanceRouter.get("/daily", c.authenticate, c.requireAdminOrLibrarian, c.getDailyAttendance);

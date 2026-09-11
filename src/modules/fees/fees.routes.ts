@@ -7,6 +7,7 @@ feesRouter.post("/generate", c.authenticate, c.requireAdmin, c.generate);
 feesRouter.get("/", c.authenticate, c.requireAdminOrLibrarian, c.list);
 feesRouter.get("/stats", c.authenticate, c.requireAdminOrLibrarian, c.stats);
 feesRouter.get("/payments/history", c.authenticate, c.requireAdminOrLibrarian, c.paymentHistory);
+feesRouter.get("/payments/by-date", c.authenticate, c.requireAdminOrLibrarian, c.paymentsByDate);
 feesRouter.get("/my", c.authenticate, c.myFees);
 feesRouter.get("/my/payments", c.authenticate, c.myPayments);
 feesRouter.get("/my/current", c.authenticate, c.myCurrentFee);

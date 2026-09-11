@@ -358,4 +358,30 @@ export async function findPaymentsForUser(userId: number) {
   return res.rows;
 }
 
+/**
+ * All payments recorded on a given IST calendar day (student + amount + method
+ * + who recorded it), used by the student-directory daily activity panel.
+ */
+export async function findPaymentsByDate(date: string) {
+  const res = await SimpleDatabase.query(
+    `SELECT fp.id, fp.amount, fp.payment_method, fp.paid_at, fp.notes,
+            fi.id AS invoice_id, fi.billing_year, fi.billing_month, fi.plan_name,
+            fi.amount AS invoice_amount,
+            SUM(fp.amount) OVER (
+              PARTITION BY fi.id ORDER BY fp.paid_at ASC, fp.id ASC
+              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS cumulative_paid,
+            u.id AS user_id, u.member_id, u.full_name,
+            r.full_name AS recorded_by_name
+     FROM fee_payments fp
+     JOIN fee_invoices fi ON fi.id = fp.invoice_id
+     JOIN users u ON u.id = fi.user_id
+     LEFT JOIN users r ON r.id = fp.recorded_by
+     WHERE (fp.paid_at AT TIME ZONE 'UTC' + INTERVAL '5 hours 30 minutes')::date = $1::date
+     ORDER BY fp.paid_at ASC`,
+    [date]
+  );
+  return res.rows;
+}
+
 export { INVOICE_COLUMNS, USER_COLUMNS };

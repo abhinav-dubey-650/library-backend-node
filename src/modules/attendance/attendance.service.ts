@@ -224,6 +224,20 @@ export async function getActiveSessions() {
   return Promise.all(rows.map((r) => loadAttendanceJson(r)));
 }
 
+export async function getDailyAttendance(date: string) {
+  const rows = await repo.findAttendanceByDate(date);
+  return rows.map((r) => ({
+    attendanceId: Number(r.attendance_id),
+    userId: Number(r.user_id),
+    memberId: String(r.member_id),
+    fullName: String(r.full_name),
+    seatNumber: r.seat_number != null ? String(r.seat_number) : null,
+    checkInTime: toIsoOrNull(r.check_in_time),
+    checkOutTime: toIsoOrNull(r.check_out_time),
+    isActive: r.is_active === true,
+  }));
+}
+
 export async function getSeatIdsOccupiedByPunchIn() {
   return repo.findSeatIdsWithActivePunchIn();
 }

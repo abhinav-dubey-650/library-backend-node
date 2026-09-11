@@ -73,6 +73,13 @@ export const paymentHistory = createHandler(async (req, res) => {
   res.status(200).json(await svc.getPaymentHistory(year, month, search, page, size));
 });
 
+export const paymentsByDate = createHandler(async (req, res) => {
+  requirePin(req.header("X-Admin-Pin"));
+  const date = String(req.query.date ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw AppError.badRequest("date is required as YYYY-MM-DD");
+  res.status(200).json(await svc.getPaymentsByDate(date));
+});
+
 function parseId(raw: string | string[]): number {
   const id = parseInt(String(Array.isArray(raw) ? raw[0] : raw), 10);
   if (Number.isNaN(id)) throw AppError.badRequest("Invalid id");
