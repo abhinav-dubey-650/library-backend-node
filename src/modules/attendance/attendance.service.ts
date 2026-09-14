@@ -473,22 +473,23 @@ export async function qrCheckIn(memberId: string) {
     throw AppError.badRequest(shift.message);
   }
 
-  if (shift.status === "after") {
-    // Check if already has any attendance today
-    const todayCheck = await SimpleDatabase.query(
-      `SELECT id FROM attendance
-       WHERE user_id = $1
-         AND (check_in_time AT TIME ZONE 'UTC' + INTERVAL '5 hours 30 minutes')::date = CURRENT_DATE`,
-      [user.id]
-    );
-    if (todayCheck.rows.length > 0) {
-      return {
-        success: true,
-        message: "Already attended today",
-        attendance: null,
-      };
-    }
+  // Already attended today (punched in AND out, or a proxy record exists) —
+  // block any re-punch-in for the remainder of the day.
+  const todayCheck = await SimpleDatabase.query(
+    `SELECT id FROM attendance
+     WHERE user_id = $1
+       AND (check_in_time AT TIME ZONE 'UTC' + INTERVAL '5 hours 30 minutes')::date = CURRENT_DATE`,
+    [user.id]
+  );
+  if (todayCheck.rows.length > 0) {
+    return {
+      success: true,
+      message: "Already attended today",
+      attendance: null,
+    };
+  }
 
+  if (shift.status === "after") {
     // Proxy attendance: NOW() in, NOW() out
     const proxyRow = await SimpleDatabase.withTransaction(async (client) => {
       const ins = await client.query(
