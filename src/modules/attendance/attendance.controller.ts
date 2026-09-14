@@ -67,4 +67,22 @@ export const getDailyAttendance = createHandler(async (req, res) => {
   res.status(200).json(await svc.getDailyAttendance(date));
 });
 
+// ── Public QR attendance (no auth) ──────────────────────────────────────────
+
+export const qrStudents = createHandler(async (_req, res) => {
+  res.status(200).json(await svc.getQrStudents());
+});
+
+export const qrCheckIn = createHandler(async (req, res) => {
+  const memberId = String(req.body?.memberId ?? "");
+  if (!memberId.trim()) throw AppError.badRequest("memberId is required");
+  res.status(200).json(await svc.qrCheckIn(memberId));
+});
+
+export const qrCheckOut = createHandler(async (req, res) => {
+  const memberId = String(req.body?.memberId ?? "");
+  if (!memberId.trim()) throw AppError.badRequest("memberId is required");
+  res.status(200).json(await svc.qrCheckOut(memberId));
+});
+
 export { authenticate, requireAdminOrLibrarian };

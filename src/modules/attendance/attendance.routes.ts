@@ -14,3 +14,8 @@ attendanceRouter.get("/occupied-seats", c.authenticate, c.occupiedSeats);
 attendanceRouter.get("/seat-map", c.authenticate, c.seatMapSnapshot);
 attendanceRouter.get("/active", c.authenticate, c.requireAdminOrLibrarian, c.getActiveSessions);
 attendanceRouter.get("/daily", c.authenticate, c.requireAdminOrLibrarian, c.getDailyAttendance);
+
+// Public QR attendance (no auth required)
+attendanceRouter.get("/qr/students", c.qrStudents);
+attendanceRouter.post("/qr/punch-in", c.qrCheckIn);
+attendanceRouter.post("/qr/punch-out", c.qrCheckOut);

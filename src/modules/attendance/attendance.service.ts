@@ -321,6 +321,240 @@ export async function autoPunchOutEndedShifts(): Promise<number> {
   return count;
 }
 
+// ── QR / public attendance helpers ──────────────────────────────────────────
+
+type ShiftWindowStatus = "within" | "before" | "after" | "no_shift";
+
+/**
+ * Resolve the shift window status for a user relative to the current IST time.
+ * Returns the status, the shift's start/end as HH:MM strings, and a
+ * human-readable message for the frontend to display.
+ */
+const ATT_COLUMNS = `id, user_id, booking_id, check_in_time, check_out_time, created_at`;
+
+async function resolveShiftWindowStatus(
+  userId: number
+): Promise<{ status: ShiftWindowStatus; shiftStart: string | null; shiftEnd: string | null; message: string }> {
+  const res = await SimpleDatabase.query(
+    `SELECT s.start_time, s.end_time
+       FROM subscriptions sub
+       JOIN membership_plans mp ON mp.id = sub.plan_id
+       JOIN shifts s ON s.id = mp.shift_id
+      WHERE sub.user_id = $1 AND sub.status = 'ACTIVE'
+        AND CURRENT_DATE BETWEEN sub.start_date AND sub.end_date
+        AND s.is_active IS DISTINCT FROM false`,
+    [userId]
+  );
+  const windows = res.rows.filter((r: any) => r.start_time && r.end_time);
+  if (windows.length === 0) {
+    return { status: "no_shift", shiftStart: null, shiftEnd: null, message: "" };
+  }
+
+  const nowMin = istMinutesOfDay();
+
+  // Check if within any window
+  for (const w of windows) {
+    const start = parseTimeToMinutes(String(w.start_time));
+    const end = parseTimeToMinutes(String(w.end_time));
+    if (nowMin >= start && nowMin < end) {
+      return {
+        status: "within",
+        shiftStart: String(w.start_time).substring(0, 5),
+        shiftEnd: String(w.end_time).substring(0, 5),
+        message: "",
+      };
+    }
+  }
+
+  // Find the next upcoming or most-recently-ended window
+  let earliestFuture: any = null;
+  let earliestFutureMin = Infinity;
+  let latestPast: any = null;
+  let latestPastMin = -1;
+
+  for (const w of windows) {
+    const start = parseTimeToMinutes(String(w.start_time));
+    if (start > nowMin && start < earliestFutureMin) {
+      earliestFuture = w;
+      earliestFutureMin = start;
+    }
+    const end = parseTimeToMinutes(String(w.end_time));
+    if (end <= nowMin && end > latestPastMin) {
+      latestPast = w;
+      latestPastMin = end;
+    }
+  }
+
+  if (earliestFuture) {
+    const start = parseTimeToMinutes(String(earliestFuture.start_time));
+    const diffMin = start - nowMin;
+    const hours = Math.floor(diffMin / 60);
+    const mins = diffMin % 60;
+    const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+    return {
+      status: "before",
+      shiftStart: String(earliestFuture.start_time).substring(0, 5),
+      shiftEnd: String(earliestFuture.end_time).substring(0, 5),
+      message: `You can punch in after ${timeStr} (shift starts at ${formatShiftTime12h(String(earliestFuture.start_time))})`,
+    };
+  }
+
+  if (latestPast) {
+    return {
+      status: "after",
+      shiftStart: String(latestPast.start_time).substring(0, 5),
+      shiftEnd: String(latestPast.end_time).substring(0, 5),
+      message: `Your shift ended at ${formatShiftTime12h(String(latestPast.end_time))}. For attendance record only.`,
+    };
+  }
+
+  // Fallback — shouldn't reach here
+  return { status: "no_shift", shiftStart: null, shiftEnd: null, message: "" };
+}
+
+/** All active members enriched for the public QR attendance page. */
+export async function getQrStudents() {
+  const rows = await repo.findAllActiveMembersForQr();
+  const nowMin = istMinutesOfDay();
+
+  return Promise.all(
+    rows.map(async (r: any) => {
+      const userId = Number(r.user_id);
+      const shiftWindow = await resolveShiftWindowStatus(userId);
+
+      // If "after shift", determine if proxy attendance is needed
+      let proxyAllowed = false;
+      if (shiftWindow.status === "after" && !r.today_attendance_id) {
+        proxyAllowed = true;
+      }
+
+      return {
+        userId,
+        memberId: String(r.member_id),
+        fullName: String(r.full_name),
+        seatNumber: r.seat_number != null ? String(r.seat_number) : null,
+        shiftName: r.shift_name != null ? String(r.shift_name) : null,
+        shiftStart: shiftWindow.shiftStart,
+        shiftEnd: shiftWindow.shiftEnd,
+        feeStatus: r.fee_status != null ? String(r.fee_status) : null,
+        feeAmount: r.fee_amount != null ? Number(r.fee_amount) : null,
+        feePaid: r.fee_paid != null ? Number(r.fee_paid) : null,
+        isPunchedIn: r.active_attendance_id != null,
+        hasAttendedToday: r.today_attendance_id != null,
+        shiftWindowStatus: shiftWindow.status,
+        shiftWindowMessage: shiftWindow.message,
+        proxyAllowed,
+      };
+    })
+  );
+}
+
+/**
+ * QR punch-in: handles within-shift, before-shift (blocked), and after-shift
+ * (proxy attendance) cases. After-shift creates a 0-minute attendance record
+ * (NOW in, NOW out) for attendance tracking purposes.
+ */
+export async function qrCheckIn(memberId: string) {
+  const user = await findByMemberId(memberId);
+  if (!user) throw AppError.badRequest(`User with member ID ${memberId} not found`);
+
+  const active = await repo.findActiveAttendanceByUserId(Number(user.id));
+  if (active) {
+    return {
+      success: true,
+      message: "Already punched in",
+      attendance: await loadAttendanceJson(active),
+    };
+  }
+
+  const shift = await resolveShiftWindowStatus(Number(user.id));
+
+  if (shift.status === "before") {
+    throw AppError.badRequest(shift.message);
+  }
+
+  if (shift.status === "after") {
+    // Check if already has any attendance today
+    const todayCheck = await SimpleDatabase.query(
+      `SELECT id FROM attendance
+       WHERE user_id = $1
+         AND (check_in_time AT TIME ZONE 'UTC' + INTERVAL '5 hours 30 minutes')::date = CURRENT_DATE`,
+      [user.id]
+    );
+    if (todayCheck.rows.length > 0) {
+      return {
+        success: true,
+        message: "Already attended today",
+        attendance: null,
+      };
+    }
+
+    // Proxy attendance: NOW() in, NOW() out
+    const proxyRow = await SimpleDatabase.withTransaction(async (client) => {
+      const ins = await client.query(
+        `INSERT INTO attendance (user_id, booking_id, check_in_time)
+         VALUES ($1, NULL, NOW()) RETURNING ${ATT_COLUMNS}`,
+        [user.id]
+      );
+      const row = ins.rows[0];
+      const out = await client.query(
+        `UPDATE attendance SET check_out_time = NOW() WHERE id = $1 RETURNING ${ATT_COLUMNS}`,
+        [row.id]
+      );
+      return out.rows[0];
+    });
+
+    await recordSessionCompletion({
+      check_in_time: proxyRow.check_in_time,
+      check_out_time: proxyRow.check_out_time,
+      user_id: user.id,
+    });
+
+    return {
+      success: true,
+      message: "Attendance recorded (out of shift window — 0 minutes)",
+      attendance: await loadAttendanceJson(proxyRow),
+    };
+  }
+
+  // Normal within-shift or no-shift check-in
+  const booking = await repo.findActiveBookingsForUserOnDate(Number(user.id), istToday());
+  const row = await repo.insertAttendance(Number(user.id), booking ? Number(booking.id) : null);
+  void notifyPunchInIfNeeded(Number(user.id), new Date(row.check_in_time));
+
+  return {
+    success: true,
+    message: "Punched in successfully",
+    attendance: await loadAttendanceJson(row),
+  };
+}
+
+/** QR punch-out — standard checkout. */
+export async function qrCheckOut(memberId: string) {
+  const user = await findByMemberId(memberId);
+  if (!user) throw AppError.badRequest(`User with member ID ${memberId} not found`);
+
+  const attendance = await repo.findActiveAttendanceByUserId(Number(user.id));
+  if (!attendance) throw AppError.badRequest("User is not currently checked in");
+
+  const saved = await repo.checkoutAttendance(Number(attendance.id));
+  await recordSessionCompletion(saved);
+  await evaluateAndAward(Number(user.id));
+  void notifyPunchOutIfNeeded(
+    Number(user.id),
+    new Date(saved.check_in_time),
+    new Date(saved.check_out_time)
+  );
+
+  return {
+    success: true,
+    message: "Punched out successfully",
+    attendance: await loadAttendanceJson(saved),
+  };
+}
+
+// ── End QR helpers ──────────────────────────────────────────────────────────
+
 export async function getMonthlyStats(userId: number, year?: number | null, month?: number | null) {
   return statsSvc.getMonthlyStats(userId, year, month, repo);
 }

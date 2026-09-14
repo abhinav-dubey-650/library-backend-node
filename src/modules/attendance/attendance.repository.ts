@@ -202,4 +202,38 @@ export async function findAllMembers() {
   return res.rows;
 }
 
+/**
+ * All active members with seat, shift, fee, and live punch-in status — used by
+ * the public QR attendance page. One row per active member (DISTINCT ON to
+ * deduplicate users with multiple overlapping subscriptions).
+ */
+export async function findAllActiveMembersForQr() {
+  const today = istToday();
+  const res = await SimpleDatabase.query(
+    `SELECT DISTINCT ON (u.id)
+            u.id AS user_id, u.member_id, u.full_name,
+            seat.seat_number,
+            sh.name AS shift_name, sh.start_time AS shift_start, sh.end_time AS shift_end,
+            fi.status AS fee_status, fi.amount AS fee_amount, fi.amount_paid AS fee_paid,
+            att.id AS active_attendance_id,
+            today_att.id AS today_attendance_id
+     FROM users u
+     LEFT JOIN seats seat ON seat.id = u.assigned_seat_id
+     LEFT JOIN subscriptions sub ON sub.user_id = u.id AND sub.status = 'ACTIVE'
+       AND CURRENT_DATE BETWEEN sub.start_date AND sub.end_date
+     LEFT JOIN membership_plans mp ON mp.id = sub.plan_id
+     LEFT JOIN shifts sh ON sh.id = mp.shift_id AND sh.is_active IS DISTINCT FROM false
+     LEFT JOIN fee_invoices fi ON fi.user_id = u.id
+       AND fi.billing_year = EXTRACT(YEAR FROM (NOW() AT TIME ZONE 'Asia/Kolkata'))::int
+       AND fi.billing_month = EXTRACT(MONTH FROM (NOW() AT TIME ZONE 'Asia/Kolkata'))::int
+     LEFT JOIN attendance att ON att.user_id = u.id AND att.check_out_time IS NULL
+     LEFT JOIN attendance today_att ON today_att.user_id = u.id
+       AND (today_att.check_in_time AT TIME ZONE 'UTC' + INTERVAL '5 hours 30 minutes')::date = $1::date
+     WHERE u.role = 'MEMBER' AND u.is_active = true
+     ORDER BY u.id, sh.start_time NULLS LAST`,
+    [today]
+  );
+  return res.rows;
+}
+
 export { ATT_COLUMNS };
