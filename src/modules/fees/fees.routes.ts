@@ -12,4 +12,5 @@ feesRouter.get("/my", c.authenticate, c.myFees);
 feesRouter.get("/my/payments", c.authenticate, c.myPayments);
 feesRouter.get("/my/current", c.authenticate, c.myCurrentFee);
 feesRouter.post("/:id/payments", c.authenticate, c.requireAdminOrLibrarian, c.recordPayment);
+feesRouter.delete("/payments/:id", c.authenticate, c.requireAdmin, c.revertPayment);
 feesRouter.put("/:id/waive", c.authenticate, c.requireAdmin, c.waive);

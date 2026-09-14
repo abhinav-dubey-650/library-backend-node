@@ -379,3 +379,34 @@ export async function getPaymentsByDate(date: string) {
     };
   });
 }
+
+export async function revertPayment(paymentId: number, revertedById: number) {
+  return SimpleDatabase.withTransaction(async (client) => {
+    const payment = await repo.findPaymentById(paymentId, client);
+    if (!payment) throw AppError.badRequest("Payment not found");
+
+    const reverter = await SimpleDatabase.query(`SELECT id FROM users WHERE id = $1`, [revertedById]);
+    if (reverter.rows.length === 0) throw AppError.badRequest("Reverter not found");
+
+    await repo.deletePayment(paymentId, client);
+
+    // Recalculate the invoice balance from the payments that remain, then
+    // re-derive its status (PAID / PARTIAL / PENDING / OVERDUE).
+    const updated = await repo.recomputeInvoiceAmountPaid(Number(payment.invoice_id), client);
+    if (!updated) throw AppError.badRequest("Invoice not found");
+    const status = refreshStatus(updated);
+    if (status !== updated.status) {
+      await repo.updateInvoiceStatus(Number(updated.id), status, client);
+    }
+
+    return {
+      revertedPaymentId: paymentId,
+      amount: Number(payment.amount),
+      paymentMethod: payment.payment_method ?? "CASH",
+      revertedById,
+      invoiceId: Number(updated.id),
+      status,
+      amountPaid: Number(updated.amount_paid),
+    };
+  });
+}

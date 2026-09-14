@@ -384,4 +384,33 @@ export async function findPaymentsByDate(date: string) {
   return res.rows;
 }
 
+export async function findPaymentById(paymentId: number, runner?: Runner) {
+  const res = await run(
+    runner,
+    `SELECT fp.id, fp.invoice_id, fp.amount, fp.payment_method, fp.paid_at, fp.recorded_by, fp.notes,
+            fi.user_id, fi.status AS invoice_status, fi.amount AS invoice_amount
+     FROM fee_payments fp
+     JOIN fee_invoices fi ON fi.id = fp.invoice_id
+     WHERE fp.id = $1`,
+    [paymentId]
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function deletePayment(paymentId: number, runner?: Runner) {
+  await run(runner, `DELETE FROM fee_payments WHERE id = $1`, [paymentId]);
+}
+
+export async function recomputeInvoiceAmountPaid(invoiceId: number, runner?: Runner) {
+  const res = await run(
+    runner,
+    `UPDATE fee_invoices fi
+     SET amount_paid = COALESCE((SELECT SUM(fp.amount) FROM fee_payments fp WHERE fp.invoice_id = fi.id), 0)
+     WHERE fi.id = $1
+     RETURNING ${INVOICE_COLUMNS}`,
+    [invoiceId]
+  );
+  return res.rows[0] ?? null;
+}
+
 export { INVOICE_COLUMNS, USER_COLUMNS };

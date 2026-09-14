@@ -62,6 +62,11 @@ export const waive = createHandler(async (req, res) => {
   res.status(200).json(await svc.waiveInvoice(parseId(req.params.id)));
 });
 
+export const revertPayment = createHandler(async (req, res) => {
+  requirePin(req.header("X-Admin-Pin"));
+  res.status(200).json(await svc.revertPayment(parseId(req.params.id), req.user!.userId));
+});
+
 export const paymentHistory = createHandler(async (req, res) => {
   requirePin(req.header("X-Admin-Pin"));
   const page = Math.max(0, parseInt(String(req.query.page ?? "0"), 10) || 0);
