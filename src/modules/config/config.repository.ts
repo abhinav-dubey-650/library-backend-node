@@ -24,3 +24,14 @@ export async function updateConfig(key: string, value: string) {
   );
   return res.rows[0] ?? null;
 }
+
+export async function upsertConfig(key: string, value: string, description?: string) {
+  const res = await SimpleDatabase.query(
+    `INSERT INTO library_config (config_key, config_value, description)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (config_key) DO UPDATE SET config_value = EXCLUDED.config_value
+     RETURNING config_key, config_value, description, updated_at`,
+    [key, value, description ?? null]
+  );
+  return res.rows[0] ?? null;
+}

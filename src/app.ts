@@ -44,7 +44,7 @@ export const createApp = () => {
     cors({
       origin: corsOrigins,
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Authorization", "Content-Type", "X-Admin-Pin"],
+      allowedHeaders: ["Authorization", "Content-Type", "X-Admin-Pin", "X-Kiosk-Key"],
       credentials: true,
     })
   );

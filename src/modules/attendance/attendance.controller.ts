@@ -1,7 +1,8 @@
 import { createHandler } from "../../core/http/createHandler";
 import { AppError } from "../../core/errors/AppError";
 import { authenticate } from "../../middlewares/authMiddleware";
-import { requireAdminOrLibrarian } from "../../middlewares/requireRole";
+import { requireAdmin, requireAdminOrLibrarian } from "../../middlewares/requireRole";
+import { getKioskSecret } from "../../middlewares/kioskAuth";
 import * as svc from "./attendance.service";
 
 function parseOptionalInt(v: unknown): number | null {
@@ -69,6 +70,12 @@ export const getDailyAttendance = createHandler(async (req, res) => {
 
 // ── Public QR attendance (no auth) ──────────────────────────────────────────
 
+// Admin-only helper: returns the active kiosk key so the dashboard can build
+// the wall QR URL, and auto-creates one the first time it is asked for.
+export const getKioskKey = createHandler(async (_req, res) => {
+  res.status(200).json({ secret: await getKioskSecret() });
+});
+
 export const qrStudents = createHandler(async (_req, res) => {
   res.status(200).json(await svc.getQrStudents());
 });
@@ -85,4 +92,4 @@ export const qrCheckOut = createHandler(async (req, res) => {
   res.status(200).json(await svc.qrCheckOut(memberId));
 });
 
-export { authenticate, requireAdminOrLibrarian };
+export { authenticate, requireAdmin, requireAdminOrLibrarian };

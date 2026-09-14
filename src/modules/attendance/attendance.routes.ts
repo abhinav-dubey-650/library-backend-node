@@ -1,5 +1,7 @@
 import { Router } from "express";
 import * as c from "./attendance.controller";
+import { kioskAuth } from "../../middlewares/kioskAuth";
+import { kioskReadLimit, kioskWriteLimit } from "../../middlewares/kioskRateLimit";
 
 export const attendanceRouter = Router();
 
@@ -15,7 +17,9 @@ attendanceRouter.get("/seat-map", c.authenticate, c.seatMapSnapshot);
 attendanceRouter.get("/active", c.authenticate, c.requireAdminOrLibrarian, c.getActiveSessions);
 attendanceRouter.get("/daily", c.authenticate, c.requireAdminOrLibrarian, c.getDailyAttendance);
 
-// Public QR attendance (no auth required)
-attendanceRouter.get("/qr/students", c.qrStudents);
-attendanceRouter.post("/qr/punch-in", c.qrCheckIn);
-attendanceRouter.post("/qr/punch-out", c.qrCheckOut);
+// Public QR attendance — gated by a shared kiosk key (embedded in the wall QR)
+// and per-IP rate limits. Admin can fetch/rotate the key via /qr/key.
+attendanceRouter.get("/qr/students", kioskReadLimit, kioskAuth, c.qrStudents);
+attendanceRouter.post("/qr/punch-in", kioskWriteLimit, kioskAuth, c.qrCheckIn);
+attendanceRouter.post("/qr/punch-out", kioskWriteLimit, kioskAuth, c.qrCheckOut);
+attendanceRouter.get("/qr/key", c.authenticate, c.requireAdmin, c.getKioskKey);
