@@ -19,12 +19,12 @@ export interface StudentFormFields {
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-const EXTRACT_PROMPT = `You are given a photo of a student admission/registration form for a library. The form is in English.
-Extract the following fields exactly and return ONLY JSON (no markdown, no commentary):
-- fullName: the full name of the student
+const EXTRACT_PROMPT = `You are given a photo of a student admission/registration form for a library. The form may be filled in English OR Hindi (or a mix of both).
+Extract the following fields and return ONLY JSON (no markdown, no commentary):
+- fullName: the full name of the student (write it in English/Roman letters)
 - phoneNumber: the mobile/phone number as digits only (include the country code if visible)
-- dob: the date of birth as YYYY-MM-DD (convert the form's format if needed)
-- address: the full residential address
+- dob: the date of birth as YYYY-MM-DD (convert the form's format if needed, including Hindi dates)
+- address: the full residential address translated into English
 If a field is missing or not clearly visible, use null for it.`;
 
 async function callGemini(image: OcrImage): Promise<{
