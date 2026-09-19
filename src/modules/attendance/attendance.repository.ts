@@ -2,7 +2,7 @@ import { PoolClient } from "pg";
 import { SimpleDatabase } from "../../core/database/SimpleDatabase";
 import { USER_COLUMNS, SEAT_COLUMNS } from "../auth/auth.repository";
 import { BOOKING_COLUMNS } from "../booking/booking.repository";
-import { istToday } from "../../shared/ist";
+import { istToday, addDays } from "../../shared/ist";
 
 const ATT_COLUMNS = `id, user_id, booking_id, check_in_time, check_out_time, created_at`;
 
@@ -237,3 +237,36 @@ export async function findAllActiveMembersForQr() {
 }
 
 export { ATT_COLUMNS };
+
+/**
+ * Distinct IST calendar dates on which each user attended during the last
+ * `lookbackDays` days (including today). Used by the QR attendance board to
+ * render per-student 10-day dots and the present/30-days count.
+ */
+export async function findRecentAttendanceDates(
+  userIds: number[],
+  lookbackDays: number
+): Promise<Map<number, Set<string>>> {
+  if (userIds.length === 0) return new Map();
+  const since = addDays(istToday(), -(lookbackDays - 1));
+  const res = await SimpleDatabase.query(
+    `SELECT DISTINCT user_id,
+            ((check_in_time AT TIME ZONE 'UTC' + INTERVAL '5 hours 30 minutes')::date)::text AS d
+     FROM attendance
+     WHERE user_id = ANY($1::int[])
+       AND (check_in_time AT TIME ZONE 'UTC' + INTERVAL '5 hours 30 minutes')::date >= $2::date
+       AND check_in_time IS NOT NULL`,
+    [userIds, since]
+  );
+  const map = new Map<number, Set<string>>();
+  for (const row of res.rows) {
+    const id = Number(row.user_id);
+    let set = map.get(id);
+    if (!set) {
+      set = new Set();
+      map.set(id, set);
+    }
+    set.add(String(row.d));
+  }
+  return map;
+}

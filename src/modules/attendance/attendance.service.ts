@@ -417,6 +417,13 @@ export async function getQrStudents() {
   const rows = await repo.findAllActiveMembersForQr();
   const nowMin = istMinutesOfDay();
 
+  // Attendance history (last 30 days) in one query — powers the per-student
+  // green/red dots and the "present days / 30" count on the QR board.
+  const attendanceDates = await repo.findRecentAttendanceDates(
+    rows.map((r: any) => Number(r.user_id)),
+    30
+  );
+
   return Promise.all(
     rows.map(async (r: any) => {
       const userId = Number(r.user_id);
@@ -427,6 +434,9 @@ export async function getQrStudents() {
       if (shiftWindow.status === "after" && !r.today_attendance_id) {
         proxyAllowed = true;
       }
+
+      const attended = attendanceDates.get(userId);
+      const attendanceDays = attended ? Array.from(attended).sort() : [];
 
       return {
         userId,
@@ -444,6 +454,7 @@ export async function getQrStudents() {
         shiftWindowStatus: shiftWindow.status,
         shiftWindowMessage: shiftWindow.message,
         proxyAllowed,
+        attendanceDays,
       };
     })
   );
