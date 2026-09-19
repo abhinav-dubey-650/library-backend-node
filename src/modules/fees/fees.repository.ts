@@ -74,14 +74,16 @@ export async function findInvoiceByUserMonth(userId: number, year: number, month
   return res.rows[0] ?? null;
 }
 
-export async function findInvoiceGeneratedOnDate(userId: number, dateIso: string) {
+export async function findLatestInvoiceDate(userId: number): Promise<string | null> {
   const res = await SimpleDatabase.query(
-    `SELECT ${INVOICE_COLUMNS} FROM fee_invoices
-     WHERE user_id = $1 AND DATE(generated_at AT TIME ZONE 'Asia/Kolkata') = $2::date
+    `SELECT (DATE(generated_at AT TIME ZONE 'Asia/Kolkata'))::text AS dt
+     FROM fee_invoices
+     WHERE user_id = $1
+     ORDER BY generated_at DESC
      LIMIT 1`,
-    [userId, dateIso]
+    [userId]
   );
-  return res.rows[0] ?? null;
+  return res.rows[0]?.dt ?? null;
 }
 
 export async function insertInvoice(

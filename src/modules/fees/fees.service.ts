@@ -2,7 +2,7 @@ import { AppError } from "../../core/errors/AppError";
 import { SimpleDatabase } from "../../core/database/SimpleDatabase";
 import { serializeFeeInvoice } from "../../shared/serializers";
 import { springPage } from "../../shared/springPage";
-import { istToday, daysInMonth, monthStart, monthEnd, addDays, isPlanBillingCycleDay } from "../../shared/ist";
+import { istToday, daysInMonth, monthStart, monthEnd, addDays, daysBetween } from "../../shared/ist";
 import { applyDiscount } from "../../shared/pricing";
 import * as repo from "./fees.repository";
 import type { FeePaymentInput } from "./fees.validator";
@@ -132,17 +132,22 @@ export async function runAutoFeeGenerationForToday() {
   const createdForNotify: { userId: number; amount: number; dueDate: string }[] = [];
 
   for (const sub of subs) {
-    const startDate = String(sub.start_date).substring(0, 10);
     const durationDays = Number(sub.duration_days ?? 30);
-    if (!isPlanBillingCycleDay(startDate, today, durationDays)) {
-      skipped++;
-      continue;
-    }
-
     const userId = Number(sub.user_id);
-    if (await repo.findInvoiceGeneratedOnDate(userId, today)) {
-      skipped++;
-      continue;
+
+    // Rolling duration_days cadence from the LAST invoice (mobile-recharge
+    // model). Bill again whenever the previous invoice is at least the plan
+    // length old — even if it lands in the same calendar month (two 30-day
+    // cycles can both fall in May, e.g. 1 May + 31 May). is_active users only:
+    // deactivation stops billing, and the gap dries up because no invoices are
+    // generated while inactive.
+    const lastInvoiceDate = await repo.findLatestInvoiceDate(userId);
+    if (lastInvoiceDate) {
+      const daysSinceLast = daysBetween(today, lastInvoiceDate);
+      if (daysSinceLast < durationDays) {
+        skipped++;
+        continue;
+      }
     }
 
     const billedAmount = applyDiscount(sub.plan_price, sub.discount_percent);
