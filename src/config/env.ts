@@ -33,6 +33,11 @@ const EnvSchema = z.object({
   WHATSAPP_RATE_LIMIT_PER_DAY: z.string().optional().default("10000"),
   WHATSAPP_MONTHLY_COLLECTION_RECIPIENTS: z.string().optional().default(""),
   WHATSAPP_QUEUE_RETENTION_DAYS: z.string().optional().default("10"),
+
+  // Student form OCR (Gemini).
+  GEMINI_API_KEY: z.string().optional().default(""),
+  // Flash Lite = fast + the most generous free-tier quota (500 req/day).
+  OCR_MODEL: z.string().optional().default("gemini-3.1-flash-lite"),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
