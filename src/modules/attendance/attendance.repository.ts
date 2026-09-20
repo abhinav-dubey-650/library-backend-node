@@ -207,6 +207,20 @@ export async function findAllMembers() {
  * the public QR attendance page. One row per active member (DISTINCT ON to
  * deduplicate users with multiple overlapping subscriptions).
  */
+export async function findSlotMembers(slotId: number, today: string) {
+  const res = await SimpleDatabase.query(
+    `SELECT DISTINCT u.id AS user_id, u.member_id, u.full_name, u.assigned_seat_id
+     FROM subscriptions sub
+     JOIN users u ON u.id = sub.user_id AND u.role = 'MEMBER'
+     JOIN membership_plans mp ON mp.id = sub.plan_id
+     WHERE mp.shift_id = $1 AND sub.status = 'ACTIVE'
+       AND $2::date BETWEEN sub.start_date AND sub.end_date
+     ORDER BY u.full_name`,
+    [slotId, today]
+  );
+  return res.rows;
+}
+
 export async function findAllActiveMembersForQr() {
   const today = istToday();
   const res = await SimpleDatabase.query(

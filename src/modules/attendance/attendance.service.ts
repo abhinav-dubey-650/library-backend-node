@@ -413,6 +413,24 @@ async function resolveShiftWindowStatus(
 }
 
 /** All active members enriched for the public QR attendance page. */
+export async function getSlotMembers(slotId: number) {
+  const today = istToday();
+  const rows = await repo.findSlotMembers(slotId, today);
+  const userIds = rows.map((r: any) => Number(r.user_id));
+  const attendanceDates = await repo.findRecentAttendanceDates(userIds, 301);
+  return rows.map((r: any) => {
+    const userId = Number(r.user_id);
+    const days = attendanceDates.get(userId);
+    return {
+      userId,
+      memberId: String(r.member_id),
+      fullName: String(r.full_name),
+      presentDays: days ? days.size : 0,
+      attendanceDays: days ? Array.from(days).sort() : [],
+    };
+  });
+}
+
 export async function getQrStudents() {
   const rows = await repo.findAllActiveMembersForQr();
   const nowMin = istMinutesOfDay();

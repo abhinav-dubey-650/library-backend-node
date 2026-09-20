@@ -21,6 +21,7 @@ export async function getAdminDashboard() {
   return {
     totalMembers: Number(members.rows[0]?.cnt ?? 0),
     activeMembers: Number(activeMembers.rows[0]?.cnt ?? 0),
+    inactiveMembers: Math.max(0, Number(members.rows[0]?.cnt ?? 0) - Number(activeMembers.rows[0]?.cnt ?? 0)),
     checkedInNow: Number(checkedIn.rows[0]?.cnt ?? 0),
     totalSeats: seatRows.length,
     availableSeats: available,

@@ -19,6 +19,7 @@ attendanceRouter.get("/daily", c.authenticate, c.requireAdminOrLibrarian, c.getD
 
 // Public QR attendance — gated by a shared kiosk key (embedded in the wall QR)
 // and per-IP rate limits. Admin can fetch/rotate the key via /qr/key.
+attendanceRouter.get("/slot/:slotId/members", c.authenticate, c.requireAdminOrLibrarian, c.slotMembers);
 attendanceRouter.get("/qr/students", kioskReadLimit, kioskAuth, c.qrStudents);
 attendanceRouter.post("/qr/punch-in", kioskWriteLimit, kioskAuth, c.qrCheckIn);
 attendanceRouter.post("/qr/punch-out", kioskWriteLimit, kioskAuth, c.qrCheckOut);

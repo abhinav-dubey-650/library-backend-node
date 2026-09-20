@@ -76,6 +76,12 @@ export const getKioskKey = createHandler(async (_req, res) => {
   res.status(200).json({ secret: await getKioskSecret() });
 });
 
+export const slotMembers = createHandler(async (req, res) => {
+  const slotId = Number(req.params.slotId);
+  if (Number.isNaN(slotId)) throw new AppError("slotId is required", 400);
+  res.status(200).json(await svc.getSlotMembers(slotId));
+});
+
 export const qrStudents = createHandler(async (_req, res) => {
   res.status(200).json(await svc.getQrStudents());
 });
