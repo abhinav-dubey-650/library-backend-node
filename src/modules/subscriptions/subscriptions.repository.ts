@@ -117,6 +117,7 @@ export async function countActiveByPlanId(planId: number, today: string) {
        FROM subscriptions s
        JOIN users u ON u.id = s.user_id AND u.role = 'MEMBER'
       WHERE s.plan_id = $1 AND s.status = 'ACTIVE'
+        AND u.is_active = true
         AND $2::date BETWEEN s.start_date AND s.end_date`,
     [planId, today]
   );

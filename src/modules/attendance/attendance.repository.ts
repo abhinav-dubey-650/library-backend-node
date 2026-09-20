@@ -214,6 +214,7 @@ export async function findSlotMembers(slotId: number, today: string) {
      JOIN users u ON u.id = sub.user_id AND u.role = 'MEMBER'
      JOIN membership_plans mp ON mp.id = sub.plan_id
      WHERE mp.shift_id = $1 AND sub.status = 'ACTIVE'
+       AND u.is_active = true
        AND $2::date BETWEEN sub.start_date AND sub.end_date
      ORDER BY u.full_name`,
     [slotId, today]
