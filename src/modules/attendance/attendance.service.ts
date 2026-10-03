@@ -467,6 +467,12 @@ export async function getQrStudents() {
         feeStatus: r.fee_status != null ? String(r.fee_status) : null,
         feeAmount: r.fee_amount != null ? Number(r.fee_amount) : null,
         feePaid: r.fee_paid != null ? Number(r.fee_paid) : null,
+        feeSince:
+          r.fee_since instanceof Date
+            ? r.fee_since.toISOString().substring(0, 10)
+            : r.fee_since != null
+              ? String(r.fee_since).substring(0, 10)
+              : null,
         isPunchedIn: r.active_attendance_id != null,
         hasAttendedToday: r.today_attendance_id != null,
         shiftWindowStatus: shiftWindow.status,

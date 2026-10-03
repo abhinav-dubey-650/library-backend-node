@@ -6,6 +6,7 @@ import {
   queueTemplateMessages,
   loadAllLibraryBroadcastRecipients,
 } from "../whatsapp/notify.helpers";
+import type { BroadcastAudience } from "../whatsapp/notify.helpers";
 import { uploadMediaToMeta } from "../whatsapp/whatsapp.service";
 
 const MAX_LEN = 900;
@@ -25,18 +26,24 @@ export interface BroadcastInput {
   message?: string;
   occasion?: string;
   image?: AnnouncementImage;
+  audience?: BroadcastAudience;
 }
 
 /**
- * Broadcast an admin message to every active member + admin. Every template is
- * personalised with the recipient's name in {{1}}; {{2}} holds the announcement
- * body (text/image) or the festival occasion. Images are uploaded to Meta media
- * and attached as the header. Delivery runs through the rate-limited queue.
+ * Broadcast an admin message to the chosen audience (active users, inactive
+ * members, or everyone) + admin. Every template is personalised with the
+ * recipient's name in {{1}}; {{2}} holds the announcement body (text/image)
+ * or the festival occasion. Images are uploaded to Meta media and attached as
+ * the header. Delivery runs through the rate-limited queue.
  */
 export async function broadcastAnnouncement(input: BroadcastInput): Promise<{ recipients: number }> {
   if (!whatsappConfig.enabled) throw AppError.badRequest("WhatsApp is disabled");
 
   const type = input.type;
+  const audience: BroadcastAudience = input.audience ?? "active";
+  if (!["active", "inactive", "all"].includes(audience)) {
+    throw AppError.badRequest("Invalid announcement audience");
+  }
   const message = (input.message ?? "").trim();
   const occasion = (input.occasion ?? "").trim();
 
@@ -56,7 +63,7 @@ export async function broadcastAnnouncement(input: BroadcastInput): Promise<{ re
     }
   }
 
-  const recipients = await loadAllLibraryBroadcastRecipients();
+  const recipients = await loadAllLibraryBroadcastRecipients(audience);
   if (recipients.length === 0) return { recipients: 0 };
 
   const secondVar = type === "festival" ? occasion : message;
@@ -92,6 +99,6 @@ export async function broadcastAnnouncement(input: BroadcastInput): Promise<{ re
     headerImageId ? { headerImageId } : undefined
   );
 
-  logger.info({ recipients: withVars.length, type }, "Announcement broadcast queued");
+  logger.info({ recipients: withVars.length, type, audience }, "Announcement broadcast queued");
   return { recipients: withVars.length };
 }

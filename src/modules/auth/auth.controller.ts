@@ -9,6 +9,7 @@ import {
   adminPinSchema,
   passwordResetSchema,
   studentRegisterSchema,
+  studentExportQuerySchema,
 } from "./auth.validator";
 import * as svc from "./auth.service";
 
@@ -85,6 +86,12 @@ export const getStudents = createHandler(async (req, res) => {
   const status = req.query.status != null ? String(req.query.status) : "all";
   const result = await svc.searchStudents(search, status, page, size);
   res.status(200).json(result);
+});
+
+// GET /api/auth/students/export  (ADMIN/LIBRARIAN)
+export const exportStudents = createHandler(async (req, res) => {
+  const query = studentExportQuerySchema.parse(req.query);
+  res.status(200).json(await svc.getStudentsExport(query.status));
 });
 
 // GET /api/auth/by-email  (ADMIN/LIBRARIAN)

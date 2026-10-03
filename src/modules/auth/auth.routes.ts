@@ -19,6 +19,7 @@ authRouter.get("/members", authenticate, requireAdminOrLibrarian, c.getMembers);
 authRouter.get("/users", authenticate, requireAdminOrLibrarian, c.getAllUsers);
 
 // ADMIN / LIBRARIAN
+authRouter.get("/students/export", authenticate, requireAdminOrLibrarian, c.exportStudents);
 authRouter.get("/students", authenticate, requireAdminOrLibrarian, c.getStudents);
 authRouter.get("/by-email", authenticate, requireAdminOrLibrarian, c.getByEmail);
 authRouter.get("/by-memberid", authenticate, requireAdminOrLibrarian, c.getByMemberId);

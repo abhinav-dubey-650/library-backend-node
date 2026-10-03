@@ -91,7 +91,7 @@ export async function isSeatTakenByAnotherActiveMember(
 
 /**
  * Port of searchStudents — role=MEMBER, optional fuzzy search across full_name /
- * member_id / phone_number, and status filter. Returns a Spring-style page.
+ * member_id / phone_number / seat_number, and status filter. Returns a Spring-style page.
  */
 export async function searchStudents(
   search: string | null,
@@ -99,33 +99,38 @@ export async function searchStudents(
   page: number,
   size: number
 ) {
-  const where = `role = 'MEMBER'
+  const where = `users.role = 'MEMBER'
       AND ($1::text IS NULL OR $1 = '' OR
-           LOWER(full_name) LIKE LOWER('%' || $1 || '%') OR
-           LOWER(member_id) LIKE LOWER('%' || $1 || '%') OR
-           phone_number LIKE '%' || $1 || '%')
-      AND ($2 = 'all' OR ($2 = 'active' AND is_active = true) OR ($2 = 'inactive' AND is_active = false))`;
+           LOWER(users.full_name) LIKE LOWER('%' || $1 || '%') OR
+           LOWER(users.member_id) LIKE LOWER('%' || $1 || '%') OR
+           users.phone_number LIKE '%' || $1 || '%' OR
+           LOWER(s.seat_number) LIKE LOWER('%' || $1 || '%'))
+      AND ($2 = 'all' OR ($2 = 'active' AND users.is_active = true) OR ($2 = 'inactive' AND users.is_active = false))`;
+  const from = `users LEFT JOIN seats s ON s.id = users.assigned_seat_id`;
+  const userCols = USER_COLUMNS.split(",")
+    .map((c) => `users.${c.trim()}`)
+    .join(", ");
 
-  const countRes = await SimpleDatabase.query(`SELECT COUNT(*)::bigint AS c FROM users WHERE ${where}`, [
+  const countRes = await SimpleDatabase.query(`SELECT COUNT(*)::bigint AS c FROM ${from} WHERE ${where}`, [
     search,
     status,
   ]);
   const total = Number(countRes.rows[0].c);
 
   const rowsRes = await SimpleDatabase.query(
-    `SELECT ${USER_COLUMNS},
+    `SELECT ${userCols},
        (SELECT mp.shift_id FROM subscriptions sub
           JOIN membership_plans mp ON mp.id = sub.plan_id
-         WHERE sub.user_id = users.id AND sub.status = 'ACTIVE'
-           AND CURRENT_DATE BETWEEN sub.start_date AND sub.end_date
-         ORDER BY sub.id DESC LIMIT 1) AS current_shift_id,
-       (SELECT sub.discount_percent FROM subscriptions sub
-         WHERE sub.user_id = users.id AND sub.status = 'ACTIVE'
-           AND CURRENT_DATE BETWEEN sub.start_date AND sub.end_date
-         ORDER BY sub.id DESC LIMIT 1) AS current_discount_percent
-     FROM users WHERE ${where}
-      ORDER BY created_at DESC
-      LIMIT $3 OFFSET $4`,
+          WHERE sub.user_id = users.id AND sub.status = 'ACTIVE'
+            AND CURRENT_DATE BETWEEN sub.start_date AND sub.end_date
+          ORDER BY sub.id DESC LIMIT 1) AS current_shift_id,
+        (SELECT sub.discount_percent FROM subscriptions sub
+          WHERE sub.user_id = users.id AND sub.status = 'ACTIVE'
+            AND CURRENT_DATE BETWEEN sub.start_date AND sub.end_date
+          ORDER BY sub.id DESC LIMIT 1) AS current_discount_percent
+      FROM ${from} WHERE ${where}
+       ORDER BY users.created_at DESC
+       LIMIT $3 OFFSET $4`,
     [search, status, size, page * size]
   );
 
@@ -142,6 +147,58 @@ export async function updateUser(id: number, fields: Record<string, any>, runner
     [id, ...keys.map((k) => fields[k])]
   );
   return res.rows[0] ?? null;
+}
+
+/**
+ * Full student export: one row per MEMBER with assigned seat, current/latest
+ * shift (via subscription -> plan -> shift) and latest fee invoice.
+ * Sorted by seat number in natural order (Seat-1, Seat-2, … Seat-10),
+ * unassigned seats last.
+ */
+export async function exportStudents(status: string) {
+  const res = await SimpleDatabase.query(
+    `SELECT
+       u.id, u.member_id, u.full_name, u.phone_number, u.is_active,
+       s.seat_number,
+       sh.name AS shift_name,
+       sub.start_date AS sub_start_date, sub.end_date AS sub_end_date,
+       mp.duration_days AS duration_days,
+       fi.generated_at AS last_generated_at, fi.due_date AS last_due_date,
+       fi.amount AS last_amount, fi.amount_paid AS last_amount_paid,
+       fi.status AS last_status,
+       fi.billing_year AS last_billing_year, fi.billing_month AS last_billing_month,
+       fi.plan_name AS last_plan_name
+     FROM users u
+     LEFT JOIN seats s ON s.id = u.assigned_seat_id
+     LEFT JOIN LATERAL (
+       SELECT sub2.start_date, sub2.end_date, sub2.plan_id
+       FROM subscriptions sub2
+       WHERE sub2.user_id = u.id
+       ORDER BY
+         CASE WHEN sub2.status = 'ACTIVE' AND CURRENT_DATE BETWEEN sub2.start_date AND sub2.end_date THEN 0 ELSE 1 END,
+         sub2.end_date DESC, sub2.id DESC
+       LIMIT 1
+     ) sub ON true
+     LEFT JOIN membership_plans mp ON mp.id = sub.plan_id
+     LEFT JOIN shifts sh ON sh.id = mp.shift_id
+     LEFT JOIN LATERAL (
+       SELECT fi2.generated_at, fi2.due_date, fi2.amount, fi2.amount_paid, fi2.status,
+              fi2.billing_year, fi2.billing_month, fi2.plan_name
+       FROM fee_invoices fi2
+       WHERE fi2.user_id = u.id
+       ORDER BY fi2.generated_at DESC
+       LIMIT 1
+     ) fi ON true
+     WHERE u.role = 'MEMBER'
+       AND ($1 = 'all' OR ($1 = 'active' AND u.is_active = true) OR ($1 = 'inactive' AND u.is_active = false))
+     ORDER BY
+       CASE WHEN s.seat_number IS NULL THEN 1 ELSE 0 END,
+       COALESCE(NULLIF(regexp_replace(s.seat_number, '[^0-9]', '', 'g'), '')::int, 999999),
+       s.seat_number,
+       u.full_name ASC`,
+    [status]
+  );
+  return res.rows;
 }
 
 export { USER_COLUMNS, SEAT_COLUMNS };

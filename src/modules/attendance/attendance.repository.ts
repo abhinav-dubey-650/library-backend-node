@@ -205,7 +205,10 @@ export async function findAllMembers() {
 /**
  * All active members with seat, shift, fee, and live punch-in status — used by
  * the public QR attendance page. One row per active member (DISTINCT ON to
- * deduplicate users with multiple overlapping subscriptions).
+ * deduplicate users with multiple overlapping subscriptions). Fee columns
+ * reflect the OLDEST UNPAID invoice across ALL months (so last month's dues
+ * still flag after the month rolls over), falling back to the latest invoice
+ * when nothing is outstanding.
  */
 export async function findSlotMembers(slotId: number, today: string) {
   const res = await SimpleDatabase.query(
@@ -229,7 +232,10 @@ export async function findAllActiveMembersForQr() {
             u.id AS user_id, u.member_id, u.full_name,
             seat.seat_number,
             sh.name AS shift_name, sh.start_time AS shift_start, sh.end_time AS shift_end,
-            fi.status AS fee_status, fi.amount AS fee_amount, fi.amount_paid AS fee_paid,
+            COALESCE(unpaid.status, latest.status) AS fee_status,
+            COALESCE(unpaid.amount, latest.amount) AS fee_amount,
+            COALESCE(unpaid.amount_paid, latest.amount_paid) AS fee_paid,
+            unpaid.generated_at AS fee_since,
             att.id AS active_attendance_id,
             today_att.id AS today_attendance_id
      FROM users u
@@ -238,9 +244,16 @@ export async function findAllActiveMembersForQr() {
        AND CURRENT_DATE BETWEEN sub.start_date AND sub.end_date
      LEFT JOIN membership_plans mp ON mp.id = sub.plan_id
      LEFT JOIN shifts sh ON sh.id = mp.shift_id AND sh.is_active IS DISTINCT FROM false
-     LEFT JOIN fee_invoices fi ON fi.user_id = u.id
-       AND fi.billing_year = EXTRACT(YEAR FROM (NOW() AT TIME ZONE 'Asia/Kolkata'))::int
-       AND fi.billing_month = EXTRACT(MONTH FROM (NOW() AT TIME ZONE 'Asia/Kolkata'))::int
+     LEFT JOIN LATERAL (
+       SELECT status, amount, amount_paid, generated_at FROM fee_invoices
+       WHERE user_id = u.id AND status NOT IN ('PAID', 'WAIVED') AND amount > amount_paid
+       ORDER BY generated_at ASC LIMIT 1
+     ) unpaid ON true
+     LEFT JOIN LATERAL (
+       SELECT status, amount, amount_paid FROM fee_invoices
+       WHERE user_id = u.id
+       ORDER BY generated_at DESC LIMIT 1
+     ) latest ON true
      LEFT JOIN attendance att ON att.user_id = u.id AND att.check_out_time IS NULL
      LEFT JOIN attendance today_att ON today_att.user_id = u.id
        AND (today_att.check_in_time AT TIME ZONE 'UTC' + INTERVAL '5 hours 30 minutes')::date = $1::date

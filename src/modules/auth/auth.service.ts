@@ -5,7 +5,7 @@ import { generateToken } from "../../shared/token";
 import { generateNextMemberId } from "../../shared/memberId";
 import { serializeUser } from "../../shared/serializers";
 import { springPage } from "../../shared/springPage";
-import { istToday, addDays } from "../../shared/ist";
+import { istToday, addDays, daysBetween } from "../../shared/ist";
 import { applyDiscount, normalizeDiscountPercent } from "../../shared/pricing";
 import { notifyAdmissionIfNeeded } from "../whatsapp/admission.service";
 import { notifyNewMemberFromUserId, DEFAULT_EXAM_NAME } from "../whatsapp/library-notifications.service";
@@ -20,6 +20,13 @@ import type { RegisterInput, StudentRegisterInput } from "./auth.validator";
 
 function normalizeMemberId(memberId: string): string {
   return memberId.trim().toUpperCase().replace(/-/g, "").replace(/ /g, "");
+}
+
+/** timestamptz / date / string -> `YYYY-MM-DD` (same truncation as serializers.formatDate). */
+function toDateOnly(v: any): string | null {
+  if (v == null) return null;
+  if (v instanceof Date) return v.toISOString().substring(0, 10);
+  return String(v).substring(0, 10);
 }
 
 /** findByMemberId: normalized match first, then exact trimmed fallback. */
@@ -443,6 +450,57 @@ export async function searchStudents(search: string | null, statusRaw: string, p
   const { rows, total } = await repo.searchStudents(search && search !== "" ? search : null, status, page, size);
   const content = await serializeUsersWithSeats(rows);
   return springPage(content, total, page, size);
+}
+
+/** Student directory export: seat/shift + last fee + upcoming fee, seat-number order. */
+export async function getStudentsExport(status: "active" | "inactive" | "all") {
+  const rows = await repo.exportStudents(status);
+  const today = istToday();
+
+  return rows.map((r: any) => {
+    const lastGeneratedDate = toDateOnly(r.last_generated_at);
+    const lastDueDate = toDateOnly(r.last_due_date);
+    const subStart = toDateOnly(r.sub_start_date);
+    const subEnd = toDateOnly(r.sub_end_date);
+    const durationDays = r.duration_days != null ? Number(r.duration_days) : null;
+
+    // Upcoming fee generation — mirrors the auto-billing cron
+    // (runAutoFeeGenerationForToday): the next cycle after the last generated
+    // invoice (fallback: subscription start), rolled forward to today or later.
+    // Same modular arithmetic as the frontend nextPlanBillingDate helper.
+    let upcomingFeeDate: string | null = null;
+    const ref = lastGeneratedDate ?? subStart;
+    if (ref && durationDays != null && durationDays > 0) {
+      const daysSinceRef = daysBetween(today, ref);
+      if (daysSinceRef <= 0) {
+        upcomingFeeDate = addDays(ref, durationDays);
+      } else if (daysSinceRef % durationDays === 0) {
+        upcomingFeeDate = today;
+      } else {
+        upcomingFeeDate = addDays(ref, (Math.floor(daysSinceRef / durationDays) + 1) * durationDays);
+      }
+    }
+
+    return {
+      fullName: r.full_name,
+      memberId: r.member_id,
+      phoneNumber: r.phone_number ?? null,
+      isActive: r.is_active === true,
+      status: r.is_active === true ? "Active" : "Inactive",
+      seatNumber: r.seat_number ?? null,
+      shiftName: r.shift_name ?? null,
+      subscriptionStartDate: subStart,
+      subscriptionEndDate: subEnd,
+      lastFeeGeneratedDate: lastGeneratedDate,
+      lastFeeDueDate: lastDueDate,
+      lastFeeAmount: r.last_amount != null ? Number(r.last_amount) : null,
+      lastFeeAmountPaid: r.last_amount_paid != null ? Number(r.last_amount_paid) : null,
+      lastFeeStatus: r.last_status ?? null,
+      lastBillingYear: r.last_billing_year != null ? Number(r.last_billing_year) : null,
+      lastBillingMonth: r.last_billing_month != null ? Number(r.last_billing_month) : null,
+      upcomingFeeDate,
+    };
+  });
 }
 
 // ---- helpers for embedding assignedSeat ----

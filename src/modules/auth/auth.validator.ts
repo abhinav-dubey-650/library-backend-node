@@ -48,3 +48,11 @@ export const studentRegisterSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type StudentRegisterInput = z.infer<typeof studentRegisterSchema>;
+
+// GET /api/auth/students/export — status defaults to active (the export modal
+// pre-selects Active); unknown values are rejected with 400.
+export const studentExportQuerySchema = z.object({
+  status: z.enum(["active", "inactive", "all"]).optional().default("active"),
+});
+
+export type StudentExportQuery = z.infer<typeof studentExportQuerySchema>;

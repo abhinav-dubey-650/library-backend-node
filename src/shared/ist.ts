@@ -49,7 +49,7 @@ export function istDayOfMonth(now: Date = new Date()): number {
 /** True when `now` is the last calendar day of the month in IST. */
 export function isLastDayOfMonthIST(now: Date = new Date()): boolean {
   const p = istParts(now);
-  const next = new Date(Date.UTC(p.year, p.month, p.day + 1));
+  const next = new Date(Date.UTC(p.year, p.month - 1, p.day + 1));
   return next.getUTCMonth() + 1 !== p.month;
 }
 

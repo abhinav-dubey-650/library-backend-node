@@ -170,7 +170,16 @@ export async function searchInvoices(
      FROM fee_invoices fi
      JOIN users u ON u.id = fi.user_id
      WHERE ${where}
-     ORDER BY fi.billing_year DESC, fi.billing_month DESC, u.full_name ASC
+     ORDER BY fi.billing_year DESC, fi.billing_month DESC,
+       CASE
+         WHEN fi.status = 'OVERDUE' THEN 0
+         WHEN fi.status = 'PENDING' AND fi.due_date < CURRENT_DATE THEN 0
+         WHEN fi.status = 'PENDING' THEN 1
+         WHEN fi.status = 'PARTIAL' THEN 2
+         WHEN fi.status = 'PAID' THEN 3
+         ELSE 4
+       END,
+       fi.due_date ASC, u.full_name ASC
      LIMIT $${idx} OFFSET $${idx + 1}`,
     [...params, size, offset]
   );

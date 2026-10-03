@@ -1,6 +1,7 @@
 import { createHandler } from "../../core/http/createHandler";
 import { AppError } from "../../core/errors/AppError";
 import { requirePin } from "../../middlewares/adminPin";
+import type { BroadcastAudience } from "../whatsapp/notify.helpers";
 import * as svc from "./announcement.service";
 
 export const broadcast = createHandler(async (req, res) => {
@@ -13,6 +14,9 @@ export const broadcast = createHandler(async (req, res) => {
 
   const message = req.body?.message != null ? String(req.body.message) : undefined;
   const occasion = req.body?.occasion != null ? String(req.body.occasion) : undefined;
+  const audience = (
+    req.body?.audience != null ? String(req.body.audience) : "active"
+  ) as BroadcastAudience;
 
   const file = (req as unknown as { file?: { buffer: Buffer; originalname?: string; mimetype?: string } }).file;
   const image = file
@@ -23,5 +27,5 @@ export const broadcast = createHandler(async (req, res) => {
       }
     : undefined;
 
-  res.status(200).json(await svc.broadcastAnnouncement({ type, message, occasion, image }));
+  res.status(200).json(await svc.broadcastAnnouncement({ type, message, occasion, image, audience }));
 });

@@ -6,7 +6,6 @@ import {
   formatTimeIST12h,
   formatDurationHrsMin,
   formatINRAmount,
-  formatBillingMonth,
   formatDateShortIST,
 } from "../../shared/ist";
 import { formatShiftTime12h } from "../../shared/shift-utils";
@@ -125,7 +124,7 @@ export async function buildDailyReportData(): Promise<DailyReportData> {
   const dueRes = await SimpleDatabase.query(
     `SELECT u.member_id, u.full_name,
             SUM(fi.amount - fi.amount_paid) AS pending,
-            MIN(fi.billing_year * 100 + fi.billing_month) AS oldest_ym
+            MIN(fi.generated_at) AS oldest_generated
        FROM fee_invoices fi
        JOIN users u ON u.id = fi.user_id
       WHERE fi.status NOT IN ('PAID', 'WAIVED')
@@ -139,12 +138,15 @@ export async function buildDailyReportData(): Promise<DailyReportData> {
   const dues = dueRes.rows.map((row: any) => {
     const pending = Number(row.pending);
     duesTotal += pending;
-    const ym = Number(row.oldest_ym);
+    const oldestIso =
+      row.oldest_generated instanceof Date
+        ? row.oldest_generated.toISOString().substring(0, 10)
+        : String(row.oldest_generated ?? "").substring(0, 10);
     return {
       name: String(row.full_name ?? "").trim(),
       memberId: String(row.member_id ?? ""),
       amountLabel: `₹${formatINRAmount(pending)}`,
-      sinceLabel: formatBillingMonth(Math.floor(ym / 100), ym % 100),
+      sinceLabel: oldestIso ? formatDateShortIST(oldestIso) : "—",
     };
   });
   const duesTotalLabel = `₹${formatINRAmount(duesTotal)}`;

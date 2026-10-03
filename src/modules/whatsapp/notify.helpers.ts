@@ -91,11 +91,22 @@ export async function queueTemplateMessages(
   void processQueuedMessages().catch(() => {});
 }
 
-/** All active library users with a phone, plus configured admin numbers (deduped by phone). */
-export async function loadAllLibraryBroadcastRecipients(): Promise<queue.WhatsAppRecipient[]> {
+/** Announcement audience: active users (current behaviour), inactive members, or both. Admin numbers are always included. */
+export type BroadcastAudience = "active" | "inactive" | "all";
+
+/** Library users with a phone for the given audience, plus configured admin numbers (deduped by phone). */
+export async function loadAllLibraryBroadcastRecipients(
+  audience: BroadcastAudience = "active"
+): Promise<queue.WhatsAppRecipient[]> {
+  const scope =
+    audience === "inactive"
+      ? `is_active = false AND role = 'MEMBER'`
+      : audience === "all"
+        ? `(is_active = true OR (is_active = false AND role = 'MEMBER'))`
+        : `is_active = true`;
   const res = await SimpleDatabase.query(
     `SELECT id, full_name, phone_number FROM users
-     WHERE is_active = true AND phone_number IS NOT NULL AND TRIM(phone_number) <> ''`,
+     WHERE ${scope} AND phone_number IS NOT NULL AND TRIM(phone_number) <> ''`,
     []
   );
   const byPhone = new Map<string, queue.WhatsAppRecipient>();
