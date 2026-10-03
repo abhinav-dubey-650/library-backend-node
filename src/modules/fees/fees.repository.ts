@@ -179,7 +179,7 @@ export async function searchInvoices(
          WHEN fi.status = 'PAID' THEN 3
          ELSE 4
        END,
-       fi.due_date ASC, u.full_name ASC
+       u.is_active DESC, fi.due_date ASC, u.full_name ASC
      LIMIT $${idx} OFFSET $${idx + 1}`,
     [...params, size, offset]
   );
