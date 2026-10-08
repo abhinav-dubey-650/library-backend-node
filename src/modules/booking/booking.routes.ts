@@ -12,6 +12,7 @@ bookingRouter.get("/bookings/date/:date", c.authenticate, c.requireAdminOrLibrar
 
 // Authenticated
 bookingRouter.get("/seats/assignable", c.authenticate, c.requireAdminOrLibrarian, c.getAssignableSeats);
+bookingRouter.get("/seats/vacancy-by-shift", c.authenticate, c.requireAdminOrLibrarian, c.getSeatVacancy);
 bookingRouter.post("/seats", c.authenticate, c.requireAdmin, c.addSeat);
 bookingRouter.put("/seats/:id/status", c.authenticate, c.requireAdminOrLibrarian, c.updateSeatStatus);
 bookingRouter.post("/seats/capacity", c.authenticate, c.requireAdmin, c.setSeatCapacity);

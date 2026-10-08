@@ -155,6 +155,34 @@ export async function getAssignableSeats(
   return result;
 }
 
+export async function getVacancyByShift() {
+  const allShifts = await cachedShifts();
+  const activeShifts = allShifts
+    .filter((s) => s.is_active)
+    .map(serializeShift)
+    .sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
+
+  const allSeats = await cachedSeats();
+  const totalUsableSeats = allSeats.filter((s) => s.status !== "MAINTENANCE").length;
+
+  // Reuse the exact same assignability check as Add/Edit Student
+  // (getAssignableSeats → shiftBlocksSeat → shiftsOverlap), one call per shift.
+  const result = [];
+  for (const shift of activeShifts) {
+    const vacant = await getAssignableSeats(null, Number(shift.id), null);
+    vacant.sort((a: any, b: any) =>
+      String(a.seatNumber).localeCompare(String(b.seatNumber), undefined, { numeric: true })
+    );
+    result.push({
+      shift,
+      vacantSeats: vacant,
+      vacantCount: vacant.length,
+      totalSeats: totalUsableSeats,
+    });
+  }
+  return result;
+}
+
 export async function addSeat(body: { seatNumber?: string; status?: string; hasPowerOutlet?: boolean }) {
   const seatNumber = body.seatNumber ?? `Seat-${Date.now()}`;
   const status = body.status ?? "AVAILABLE";

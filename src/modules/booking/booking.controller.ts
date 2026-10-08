@@ -28,6 +28,10 @@ export const getAssignableSeats = createHandler(async (req, res) => {
   );
 });
 
+export const getSeatVacancy = createHandler(async (_req, res) => {
+  res.status(200).json(await svc.getVacancyByShift());
+});
+
 export const addSeat = createHandler(async (req, res) => {
   const body = seatBodySchema.parse(req.body ?? {});
   res.status(201).json(await svc.addSeat(body));
